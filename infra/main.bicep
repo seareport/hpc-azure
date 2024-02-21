@@ -195,6 +195,12 @@ module pubStorage 'modules/storage.bicep' = {
     ]
     domains: domains
     baseTags: baseTags.common
+    readerPrincipals: [
+      operVisualVM.outputs.identityPrincipalId
+    ]
+    contributorPrincipals: [
+      operComputeVM.outputs.identityPrincipalId
+    ]
   }
 }
 
@@ -212,6 +218,10 @@ module operStorage 'modules/storage.bicep' = {
     ]
     domains: domains
     baseTags: baseTags.common
+    readerPrincipals: []
+    contributorPrincipals: [
+      operComputeVM.outputs.identityPrincipalId
+    ]
   }
 }
 
@@ -227,6 +237,8 @@ module devStorage 'modules/storage.bicep' = {
     ]
     domains: domains
     baseTags: baseTags.common
+    readerPrincipals: []
+    contributorPrincipals: []
   }
 }
 
