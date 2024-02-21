@@ -1,9 +1,11 @@
 param basePrefix string
 param location string
 param subnetId string
-param adminUsername string
-param subnetName string
-param nsgId string
+param adminUsername string = 'azuser'
+param publicSSHKey string
+param contributorIds array
+
+var VirtualMachineContributorRoleId = '9980e02c-c2be-4d73-94e8-173b1dc7cf3c'
 
 // Resource Names
 var ppgName = '${basePrefix}-ppg'
@@ -54,6 +56,9 @@ resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2023-03-01' = {
       id: ppg.id
     }
     singlePlacementGroup: false
+    upgradePolicy: {
+      mode: 'Manual'
+    }
     virtualMachineProfile: {
       evictionPolicy: 'Delete'
       priority: 'Spot'
@@ -63,12 +68,12 @@ resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2023-03-01' = {
       networkProfile: {
         networkInterfaceConfigurations: [
           {
-            name: '${vmssName}-nic-config01'
+            name: '${vmssName}-nic-config'
             properties: {
               enableAcceleratedNetworking: true
               ipConfigurations: [
                 {
-                  name: '${vmssName}-nic-config-ip-config01'
+                  name: '${vmssName}-nic-config-ip-config'
                   properties: {
                     subnet: {
                       id: subnetId
@@ -76,9 +81,6 @@ resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2023-03-01' = {
                   }
                 }
               ]
-              networkSecurityGroup: {
-                id: nsgId
-              }
               primary: true
             }
           }
@@ -89,8 +91,47 @@ resource vmss 'Microsoft.Compute/virtualMachineScaleSets@2023-03-01' = {
         computerNamePrefix: 'asdf'
         linuxConfiguration: {
           disablePasswordAuthentication: true
+          ssh: {
+            publicKeys: [
+              {
+                path: format('/home/{0}/.ssh/authorized_keys', adminUsername)
+                keyData: publicSSHKey
+              }
+            ]
+          }
         }
       }
+      storageProfile:{
+        dataDisks: []
+        osDisk: {
+          createOption: 'FromImage'
+          diskSizeGB: 64
+          managedDisk: {
+            storageAccountType: 'Premium_LRS'
+          }
+        }
+        imageReference: {
+          publisher: 'microsoft-dsvm'
+          offer: 'ubuntu-hpc'
+          sku: '2204'
+          version: 'latest'
+        }
+      }
+
     }
   }
 }
+
+// Let Identities scale the VMSS up and down
+// https://learn.microsoft.com/en-us/azure/templates/microsoft.authorization/2022-04-01/roleassignments?pivots=deployment-language-bicep
+resource virtualMachineUserLoginRoleAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = [
+  for principalId in contributorIds: {
+    name: guid(principalId, VirtualMachineContributorRoleId, vmss.id)
+    scope: vmss
+    properties: {
+      roleDefinitionId: resourceId('Microsoft.Authorization/roleDefinitions', VirtualMachineContributorRoleId)
+      principalId: principalId
+      // principalType: 'User'
+    }
+  }
+]

@@ -230,6 +230,7 @@ module devStorage 'modules/storage.bicep' = {
   }
 }
 
+// Oper Compute
 module operComputeVM 'modules/vm.bicep' = {
   name: 'deployOperComputeVM'
   scope: resourceGroup(operComputeRG.name)
@@ -246,7 +247,25 @@ module operComputeVM 'modules/vm.bicep' = {
     userPrincipalIds: userPrincipalIds
   }
 }
+module operComputeVMSS 'modules/vmss.bicep' = {
+  name: 'deployOperComputeVMSS'
+  scope: resourceGroup(operComputeRG.name)
+  params: {
+    basePrefix: prefixes.operCompute
+    location: location
+    subnetId: operNet.outputs.subnetIds.compute
+    publicSSHKey: adminPublicSSHKey
+    contributorIds: concat(
+      adminPrincipalIds,
+      [
+        operComputeVM.outputs.identityPrincipalId
+      ]
+    )
+  }
+}
 
+
+// Oper Visual
 module operVisualVM 'modules/vm.bicep' = {
   name: 'deployOperVisualVM'
   scope: resourceGroup('${prefixes.operVisual}-rg')
@@ -264,6 +283,7 @@ module operVisualVM 'modules/vm.bicep' = {
   }
 }
 
+// Dev Compute
 // module devComputeVM 'modules/vm.bicep' = {
 //   name: 'deployDevComputeVM'
 //   scope: resourceGroup('${prefixes.devCompute}-rg')
