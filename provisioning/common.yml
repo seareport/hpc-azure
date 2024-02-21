@@ -1,0 +1,81 @@
+---
+- name: "Common Setup"
+  hosts: "all"
+  gather_facts: false
+
+  tasks:
+
+    - name: "Wait for cloud-init to finish"
+      become: false
+      ansible.builtin.command: "cloud-init status --wait"
+
+    - name: "Automate restart of services after running apt commands"
+      become: true
+      copy:
+        dest: "/etc/needrestart/conf.d/no-prompt.conf"
+        content: "$nrconf{restart} = 'a';"
+
+    - name: "Install dependencies"
+      become: true
+      ansible.builtin.apt:
+        pkg:
+          - "aria2"
+          - "bat"
+          - "bzip2"
+          - "coreutils"
+          - "curl"
+          - "fd-find"
+          - "gnutls-bin"
+          - "jq"
+          - "kitty-terminfo"
+          - "moreutils"
+          - "silversearcher-ag"
+          - "stow"
+          - "sysstat"
+          - "tar"
+          - "tree"
+          - "wget"
+        state: "present"
+        update_cache: true
+        install_recommends: false
+        lock_timeout: 900
+        cache_valid_time: 3600
+      retries: 10
+      delay: 10
+
+      # https://github.com/sharkdp/bat?tab=readme-ov-file#on-ubuntu-using-apt
+    - name: "Add symlink: /usr/bin/batcat -> /usr/local/bin/bat"
+      become: true
+      ansible.builtin.shell: "ln -s /usr/bin/batcat /usr/local/bin/bat"
+      args:
+        creates: "/usr/local/bin/bat"
+
+      # https://github.com/sharkdp/fd?tab=readme-ov-file#on-ubuntu
+    - name: "Add symlink: /usr/bin/fdfind -> /usr/local/bin/fd"
+      become: true
+      ansible.builtin.shell: "ln -s /usr/bin/fdfind /usr/local/bin/fd"
+      args:
+        creates: "/usr/local/bin/fd"
+
+    - name: "Install azcli"
+      become: true
+      ansible.builtin.shell: "curl -sL https://aka.ms/InstallAzureCLIDeb | bash"
+      args:
+        creates: "/usr/bin/az"
+
+    - name: "Download azcopy"
+      become: true
+      ansible.builtin.shell: |
+        wget -O azcopy_v10.tar.gz https://aka.ms/downloadazcopy-v10-linux && tar -xf azcopy_v10.tar.gz --strip-components=1
+        mv azcopy /usr/bin/
+        chown root:root /usr/bin/azcopy
+        chmod 755 /usr/bin/azcopy
+        rm -rf azcopy_v10.tar.gz
+      args:
+        creates: "/usr/bin/azcopy"
+
+    - name: "Setting azcopy auto login"
+      become: true
+      copy:
+        content: export AZCOPY_AUTO_LOGIN_TYPE=MSI
+        dest: /etc/profile.d/azcopy_auto_login.sh
